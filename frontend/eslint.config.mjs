@@ -10,6 +10,7 @@ export default [
         }
       },
       globals: {
+        process: "readonly",
         window: "readonly",
         document: "readonly",
         localStorage: "readonly",
