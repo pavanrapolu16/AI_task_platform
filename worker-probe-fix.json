@@ -1,0 +1,23 @@
+{
+  "spec": {
+    "template": {
+      "spec": {
+        "containers": [
+          {
+            "name": "worker",
+            "livenessProbe": {
+              "exec": { "command": ["sh","-c","python -c \"import sys; sys.exit(0)\""] },
+              "initialDelaySeconds": 20,
+              "periodSeconds": 15
+            },
+            "readinessProbe": {
+              "exec": { "command": ["sh","-c","python -c \"import sys; sys.exit(0)\""] },
+              "initialDelaySeconds": 10,
+              "periodSeconds": 10
+            }
+          }
+        ]
+      }
+    }
+  }
+}

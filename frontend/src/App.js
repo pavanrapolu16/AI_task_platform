@@ -91,7 +91,7 @@ function App() {
     e.preventDefault();
     try {
       await api.post("/api/tasks", taskForm);
-      setNotice("Task created and queued automatically");
+      setNotice("Task submitted. Processing started in background.");
       setTaskForm({ title: "", inputText: "", operationType: "uppercase" });
       fetchTasks(1);
     } catch (error) {
@@ -231,7 +231,7 @@ function App() {
               onChange={(e) => setTaskForm({ ...taskForm, inputText: e.target.value })}
             />
           </label>
-          <button type="submit">Create</button>
+          <button type="submit">Run Task</button>
         </form>
       </section>
 

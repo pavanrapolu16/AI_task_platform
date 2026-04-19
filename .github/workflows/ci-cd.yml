@@ -1,0 +1,125 @@
+name: CI-CD
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+env:
+  IMAGE_TAG: ${{ github.sha }}
+  REGISTRY: docker.io
+  BACKEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/ai-task-backend
+  FRONTEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/ai-task-frontend
+  WORKER_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/ai-task-worker
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Lint backend
+        working-directory: backend
+        run: |
+          npm install
+          npm run lint
+
+      - name: Lint frontend
+        working-directory: frontend
+        run: |
+          npm install
+          npm run lint
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Lint worker
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff
+          ruff check worker/main.py
+
+  build-and-push:
+    if: github.event_name == 'push'
+    needs: [lint]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:${{ env.IMAGE_TAG }}
+            ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:latest
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:${{ env.IMAGE_TAG }}
+            ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:latest
+          build-args: |
+            REACT_APP_API_URL=/api
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./worker
+          file: ./worker/Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.WORKER_IMAGE }}:${{ env.IMAGE_TAG }}
+            ${{ env.REGISTRY }}/${{ env.WORKER_IMAGE }}:latest
+
+  update-infra-repo:
+    if: github.event_name == 'push'
+    needs: [build-and-push]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout infra repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ secrets.INFRA_REPO }}
+          token: ${{ secrets.INFRA_REPO_PAT }}
+          path: infra
+
+      - name: Update staging image tags
+        working-directory: infra
+        run: |
+          sed -i "s/newTag: .*/newTag: ${IMAGE_TAG}/g" overlays/staging/kustomization.yaml
+
+      - name: Update production image tags
+        working-directory: infra
+        run: |
+          sed -i "s/newTag: .*/newTag: ${IMAGE_TAG}/g" overlays/production/kustomization.yaml
+
+      - name: Commit and push tag updates
+        working-directory: infra
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add overlays/staging/kustomization.yaml overlays/production/kustomization.yaml
+          if git diff --cached --quiet; then
+            echo "No infra changes to commit"
+            exit 0
+          fi
+          git commit -m "chore: update image tags to ${IMAGE_TAG}"
+          git push

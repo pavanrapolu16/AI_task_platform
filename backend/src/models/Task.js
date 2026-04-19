@@ -48,4 +48,8 @@ const taskSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+taskSchema.index({ createdBy: 1, createdAt: -1 });
+taskSchema.index({ status: 1, createdAt: -1 });
+taskSchema.index({ operationType: 1, createdAt: -1 });
+
 module.exports = mongoose.model("Task", taskSchema);

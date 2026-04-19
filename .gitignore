@@ -2,6 +2,9 @@ node_modules
 build
 dist
 .env
+.env.local
+.env.*.local
 *.pyc
 __pycache__
 .DS_Store
+infra-repo/base/secret.yaml

@@ -25,7 +25,7 @@ router.post("/", async (req, res) => {
       operationType,
       createdBy: req.user.userId,
       status: "pending",
-      logs: [{ message: "Task created and auto-queued" }]
+      logs: [{ message: "Task created and queued for processing" }]
     });
 
     await enqueueTask({
